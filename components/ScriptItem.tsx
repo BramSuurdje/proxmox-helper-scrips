@@ -1,5 +1,6 @@
 "use client";
 import Image from "next/image";
+import React from "react";
 import { Suspense, useEffect, useState, useMemo } from "react";
 import { extractDate } from "@/lib/time";
 import { Button } from "./ui/button";
@@ -22,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LatestScripts from "./LatestScripts";
 import MostViewedScripts from "./MostViewedScripts";
 import RecentlyUpdatedScripts from "./RecentlyUpdatedScripts";
+import { get } from "http";
 
 function ScriptItem({
   items,
@@ -182,6 +184,30 @@ function ScriptItem({
       setWidth(window.innerWidth);
     }
   };
+
+  async function getPinnedScript(scriptUrl: any) {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Adding a delay of 500ms to reduce load on the GitHub API
+        await new Promise((r) => setTimeout(r, 1000));
+
+        const scriptName = scriptUrl.split("/").pop();
+
+        const res = await fetch(
+          "https://api.github.com/repos/tteck/Proxmox/commits/main",
+        );
+        const commits = await res.json();
+        const latestCommitSha = commits?.sha;
+
+        const pinnedScriptUrl = scriptUrl.replace(/main/, latestCommitSha)
+
+        navigator.clipboard.writeText(pinnedScriptUrl);
+        resolve(pinnedScriptUrl);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -490,6 +516,42 @@ function ScriptItem({
                             {!isMobile && installCommand
                               ? installCommand
                               : "Copy install command"}
+                            <span className="p-2"></span>
+                            <Copy className="w-4"></Copy>
+                          </Button>
+                          <p className="mt-3 pb-1 pl-1 text-xs text-muted-foreground">
+                            click to copy
+                          </p>
+                          <Button
+                            variant={"secondary"}
+                            size={"sm"}
+                            onClick={() => {
+                              toast.promise(getPinnedScript(installCommand), {
+                                loading:
+                                  "Getting the latest sha in the repository...",
+                                success: (pinnedScriptUrl) => {
+                                  return (
+                                    <div className="flex flex-col gap-3">
+                                      <div className="flex items-center gap-2">
+                                        <Clipboard className="h-4 w-4" />
+                                        <span>
+                                          Copied pinned down {item.title}{" "}
+                                          {item.item_type} to clipboard
+                                        </span>
+                                      </div>
+                                      <div>
+                                        <Button variant="outline">
+                                          <Link href={sourceUrl ? sourceUrl(pinnedScriptUrl) : ""}>View Source</Link>
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  );
+                                },
+                                error: "Failed to get pinned script",
+                              });
+                            }}
+                          >
+                            Get pinned version of the script
                             <span className="p-2"></span>
                             <Copy className="w-4"></Copy>
                           </Button>
